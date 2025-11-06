@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "osmforge"
+version = "0.1.0"
+description = ""
+authors = ["Tom Freeman <tomrfreeman3@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+shapely = "^2.1.2"
+fastapi = "^0.121.0"
+uvicorn = "^0.38.0"
+pyrosm = "^0.6.2"
+geopandas = "^1.1.1"
+duckdb = "^1.4.1"
+click = "^8.3.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
