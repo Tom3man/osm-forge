@@ -11,6 +11,7 @@ def _empty_result() -> gpd.GeoDataFrame:
     """
     Provide a consistent empty GeoDataFrame shape for downstream consumers.
     """
+
     return gpd.GeoDataFrame(
         columns=[
             "osm_id",
@@ -24,10 +25,13 @@ def _empty_result() -> gpd.GeoDataFrame:
     )
 
 
-def extract_features(pbf_path: Path, preset: FeaturePreset) -> gpd.GeoDataFrame:
+def extract_features(
+        pbf_path: Path, preset: FeaturePreset, source_region: str | None = None
+) -> gpd.GeoDataFrame:
     """
     Extract features for a given preset from a .pbf file.
     """
+
     osm = OSM(pbf_path.as_posix())
     df = osm.get_data_by_custom_criteria(
         custom_filter=preset.custom_filter,
@@ -56,7 +60,7 @@ def extract_features(pbf_path: Path, preset: FeaturePreset) -> gpd.GeoDataFrame:
 
     gdf["primary_value"] = primary_values
     gdf["feature_type"] = preset.key
-    gdf["source_region"] = pbf_path.stem.replace("-latest", "")
+    gdf["source_region"] = source_region or pbf_path.stem.replace("-latest", "")
     gdf["load_date"] = pd.Timestamp.utcnow()
 
     columns = [
@@ -70,7 +74,9 @@ def extract_features(pbf_path: Path, preset: FeaturePreset) -> gpd.GeoDataFrame:
     return gdf[columns].set_geometry("geometry")
 
 
-def save_parquet(gdf: gpd.GeoDataFrame, region: str, preset: FeaturePreset) -> Path:
+def save_parquet(
+        gdf: gpd.GeoDataFrame, region: str, preset: FeaturePreset
+) -> Path:
     """
     Persist extracted features to parquet for optional offline inspection.
     """

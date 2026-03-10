@@ -40,6 +40,12 @@ def init_db() -> None:
         ON features (feature_type, source_region);
         """
     )
+    con.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_features_geom
+        ON features USING RTREE (geometry);
+        """
+    )
     con.close()
 
 
@@ -74,11 +80,11 @@ def query_features(
     region: Optional[str] = None,
     limit: Optional[int] = None,
     bbox: Optional[Tuple[float, float, float, float]] = None,
-) -> "pd.DataFrame":
+) -> "DataFrame":
     """
     Fetch features matching the supplied filters as a pandas DataFrame.
     """
-    import pandas as pd  # Local import to avoid forcing dependency at import time.
+    from pandas import DataFrame  # noqa: F401 — used in return type string
 
     con = connect()
     clauses = ["feature_type = ?"]
@@ -121,7 +127,8 @@ def list_regions(feature_type: str) -> List[str]:
     """
     con = connect(load_spatial=False)
     rows = con.execute(
-        "SELECT DISTINCT source_region FROM features WHERE feature_type = ? ORDER BY 1",
+        "SELECT DISTINCT source_region FROM features "
+        "WHERE feature_type = ? ORDER BY 1",
         [feature_type],
     ).fetchall()
     con.close()

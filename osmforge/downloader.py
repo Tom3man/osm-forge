@@ -24,10 +24,14 @@ def md5_file(path: Path, chunk: int = 1024 * 1024) -> str:
 def download_region(region: str) -> Path:
     """
     Download .pbf file for a region (resumable).
-    """
 
-    fname = f"{region}-latest.osm.pbf"
-    url = f"{BASE_URL}/{fname}"
+    ``region`` is a Geofabrik path such as
+    ``europe/united-kingdom/england/greater-london``.
+    The local filename is derived from the leaf component only.
+    """
+    leaf = region.split("/")[-1]
+    fname = f"{leaf}-latest.osm.pbf"
+    url = f"{BASE_URL}/{region}-latest.osm.pbf"
     dest = DATA_PATH / fname
     resume_pos = dest.stat().st_size if dest.exists() else 0
     headers = {"Range": f"bytes={resume_pos}-"} if resume_pos else {}
