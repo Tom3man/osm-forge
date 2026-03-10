@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgis/postgis:17-3.6-alpine
+    container_name: osm-postgis
+    environment:
+      POSTGRES_DB: osm
+      POSTGRES_USER: osm
+      POSTGRES_PASSWORD: osm
+    ports:
+      - "5432:5432"
+    volumes:
+      - osm_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U osm -d osm"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./fastapi
+    container_name: osm-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://osm:osm@db:5432/osm
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  osm_pgdata:

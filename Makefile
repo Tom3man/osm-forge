@@ -1,51 +1,45 @@
-.PHONY: install run serve query list-regions clean clean-db clean-pbf
+PBF        ?= osmforge/data/isle-of-wight.osm.pbf
+LUA        := osmforge/osm2pgsql/osm.lua
+LAYERS_SQL := osmforge/db/layers.sql
 
-# ── Setup ─────────────────────────────────────────────────────────────────────
+DB_HOST    := localhost
+DB_PORT    := 5432
+DB_NAME    := osm
+DB_USER    := osm
+PSQL       := PGPASSWORD=osm psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME)
+OSM2PGSQL  := PGPASSWORD=osm osm2pgsql \
+                --create \
+                --output=flex \
+                --style=$(LUA) \
+                --schema=osm \
+                -H $(DB_HOST) -P $(DB_PORT) -d $(DB_NAME) -U $(DB_USER)
 
-install:
-	poetry install
+.PHONY: up down ingest layers rebuild clean help
 
-# ── Data pipeline ─────────────────────────────────────────────────────────────
+## Start PostGIS + API containers
+up:
+	docker compose -f osmforge/docker-compose.yaml up -d
 
-## Download + ingest regions (uses DEFAULT_REGIONS when --region is omitted).
-## REGION can be a group name (midlands, west-midlands, east-midlands, greater-london)
-## or a full Geofabrik path: make run REGION=europe/united-kingdom/england/greater-manchester
-run:
-ifdef REGION
-	poetry run osmforge run --region $(REGION) $(if $(PRESET),--preset $(PRESET),)
-else
-	poetry run osmforge run $(if $(PRESET),--preset $(PRESET),)
-endif
+## Stop and remove containers (keeps the data volume)
+down:
+	docker compose -f osmforge/docker-compose.yaml down
 
-# ── Query / inspect ───────────────────────────────────────────────────────────
+## Load PBF into osm.* raw tables via osm2pgsql
+## Override the file: make ingest PBF=osmforge/data/greater-london-latest.osm.pbf
+ingest:
+	$(OSM2PGSQL) $(PBF)
 
-list-regions:
-	poetry run osmforge list-regions $(if $(PRESET),--preset $(PRESET),)
+## Build app.* derived layers from osm.* raw tables
+layers:
+	$(PSQL) -f $(LAYERS_SQL)
 
-## Preview rows. Override with: make query REGION=... PRESET=buildings LIMIT=10
-query:
-	poetry run osmforge query \
-		$(if $(REGION),--region $(REGION),) \
-		$(if $(PRESET),--preset $(PRESET),) \
-		$(if $(LIMIT),--limit $(LIMIT),)
+## Full pipeline: ingest + build layers
+rebuild: ingest layers
 
-# ── API server ────────────────────────────────────────────────────────────────
+## Destroy containers AND the data volume (full reset)
+clean:
+	docker compose -f osmforge/docker-compose.yaml down -v
 
-## Start API on 127.0.0.1:8000. Override with: make serve HOST=0.0.0.0 PORT=9000
-serve:
-	poetry run osmforge serve \
-		--host $(or $(HOST),127.0.0.1) \
-		--port $(or $(PORT),8000)
-
-# ── Cleanup ───────────────────────────────────────────────────────────────────
-
-clean: clean-db clean-pbf
-
-clean-db:
-	rm -f data/osm_local.duckdb
-
-clean-pbf:
-	rm -f data/*.osm.pbf
-
-clean-parquet:
-	rm -f data/*.parquet
+## Show available targets
+help:
+	@grep -E '^##' Makefile | sed 's/## //'
