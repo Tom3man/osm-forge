@@ -1,0 +1,41 @@
+site_name: osm-forge
+site_description: Self-hosted OpenStreetMap stack and Python client for spatial analysis
+site_url: https://tom3man.github.io/osm-forge/
+repo_url: https://github.com/Tom3man/osm-forge
+repo_name: Tom3man/osm-forge
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: green
+      accent: light green
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: green
+      accent: light green
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+
+nav:
+  - Home: index.md
+  - API Reference:
+      - Client: api/client.md
+      - Download: api/download.md
