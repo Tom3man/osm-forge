@@ -9,7 +9,15 @@ SELECT
     name,
     building AS building_type,
     COALESCE(tags->>'building:levels', tags->>'levels') AS building_levels,
-    tags->>'height' AS height,
+    -- Numeric height: use tagged height first, fall back to levels * 3 m
+    CASE
+        WHEN tags->>'height' ~ '^[0-9]+(\.[0-9]+)?$'
+            THEN (tags->>'height')::float
+        WHEN COALESCE(tags->>'building:levels', tags->>'levels') ~ '^[0-9]+$'
+            THEN COALESCE(tags->>'building:levels', tags->>'levels')::float * 3.0
+        ELSE NULL
+    END AS height_m,
+    tags->>'building:material' AS material,
     tags,
     geom
 FROM osm.osm_polygons
@@ -202,3 +210,74 @@ CREATE INDEX IF NOT EXISTS osm_structures_class_idx
 ON app.osm_structures (structure_class);
 
 ANALYZE app.osm_structures;
+
+
+-- ---------------------------------------------------------------------------
+-- Terrain obstacles — diffraction edges, coastline, elevation points.
+-- These are the most important missing layer for RF propagation models.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS app.osm_terrain;
+
+CREATE TABLE app.osm_terrain AS
+
+-- Linear terrain features: cliffs, ridges, coastline, walls, embankments
+SELECT
+    osm_id,
+    name,
+    CASE
+        WHEN tags->>'natural' = 'cliff'                         THEN 'cliff'
+        WHEN tags->>'natural' = 'ridge'                         THEN 'ridge'
+        WHEN tags->>'natural' = 'coastline'                     THEN 'coastline'
+        WHEN tags->>'barrier' IN ('wall', 'retaining_wall')     THEN 'barrier_wall'
+        WHEN tags->>'man_made' = 'embankment'                   THEN 'embankment'
+        WHEN tags->>'man_made' = 'cutting'                      THEN 'cutting'
+        ELSE 'other'
+    END AS terrain_class,
+    -- height/ele as numeric where available
+    CASE
+        WHEN tags->>'height' ~ '^[0-9]+(\.[0-9]+)?$' THEN (tags->>'height')::float
+        ELSE NULL
+    END AS height_m,
+    geom
+FROM osm.osm_lines
+WHERE geom IS NOT NULL
+  AND (
+      tags->>'natural'  IN ('cliff', 'ridge', 'coastline')
+      OR tags->>'barrier'  IN ('wall', 'retaining_wall')
+      OR tags->>'man_made' IN ('embankment', 'cutting')
+  )
+
+UNION ALL
+
+-- Point terrain features: peaks, saddles, tall point structures
+SELECT
+    osm_id,
+    name,
+    CASE
+        WHEN tags->>'natural'   = 'peak'                    THEN 'peak'
+        WHEN tags->>'natural'   = 'saddle'                  THEN 'saddle'
+        WHEN tags->>'man_made'  = 'chimney'                 THEN 'chimney'
+        WHEN tags->>'man_made'  = 'storage_tank'            THEN 'storage_tank'
+        WHEN tags->>'man_made'  = 'communications_tower'    THEN 'communications_tower'
+        ELSE 'other'
+    END AS terrain_class,
+    CASE
+        WHEN COALESCE(tags->>'height', tags->>'ele') ~ '^[0-9]+(\.[0-9]+)?$'
+            THEN COALESCE(tags->>'height', tags->>'ele')::float
+        ELSE NULL
+    END AS height_m,
+    geom
+FROM osm.osm_points
+WHERE geom IS NOT NULL
+  AND (
+      tags->>'natural'  IN ('peak', 'saddle')
+      OR tags->>'man_made' IN ('chimney', 'storage_tank', 'communications_tower')
+  );
+
+CREATE INDEX IF NOT EXISTS osm_terrain_geom_gix
+ON app.osm_terrain USING GIST (geom);
+
+CREATE INDEX IF NOT EXISTS osm_terrain_class_idx
+ON app.osm_terrain (terrain_class);
+
+ANALYZE app.osm_terrain;

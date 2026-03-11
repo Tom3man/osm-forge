@@ -1,4 +1,8 @@
-PBF        ?= osmforge/data/isle-of-wight.osm.pbf
+# Resolve data directory: OSMFORGE_DATA_DIR env var, or OS user-data dir via platformdirs
+DATA_DIR   := $(shell python3 -c \
+  "import os,platformdirs; \
+   print(os.environ.get('OSMFORGE_DATA_DIR') or platformdirs.user_data_dir('osmforge'))")
+
 LUA        := osmforge/osm2pgsql/osm.lua
 LAYERS_SQL := osmforge/db/layers.sql
 
@@ -14,7 +18,17 @@ OSM2PGSQL  := PGPASSWORD=osm osm2pgsql \
                 --schema=osm \
                 -H $(DB_HOST) -P $(DB_PORT) -d $(DB_NAME) -U $(DB_USER)
 
-.PHONY: up down ingest layers rebuild clean help
+REGION     ?= isle-of-wight
+
+.PHONY: up down download ingest layers rebuild clean rebuild-api interface help
+
+## Download PBF file(s) from Geofabrik (sequential, skips existing files).
+## REGION must be a full Geofabrik path. Separate multiple with spaces.
+## Examples: make download REGION=europe/united-kingdom/england/isle-of-wight
+##           make download REGION="europe/united-kingdom/england/west-midlands europe/united-kingdom/england/staffordshire"
+## Add --force to re-download: make download REGION=... FORCE=--force
+download:
+	python3 osmforge/download.py $(REGION) $(FORCE)
 
 ## Start PostGIS + API containers
 up:
@@ -24,10 +38,9 @@ up:
 down:
 	docker compose -f osmforge/docker-compose.yaml down
 
-## Load PBF into osm.* raw tables via osm2pgsql
-## Override the file: make ingest PBF=osmforge/data/greater-london-latest.osm.pbf
+## Load all PBFs in DATA_DIR into osm.* raw tables via osm2pgsql
 ingest:
-	$(OSM2PGSQL) $(PBF)
+	$(OSM2PGSQL) $(DATA_DIR)/*.osm.pbf
 
 ## Build app.* derived layers from osm.* raw tables
 layers:
@@ -39,6 +52,14 @@ rebuild: ingest layers
 ## Destroy containers AND the data volume (full reset)
 clean:
 	docker compose -f osmforge/docker-compose.yaml down -v
+
+## Destroy containers AND the data volume (full reset), then rebuild the API container (useful if you change the API code)
+rebuild-api:
+	docker compose -f osmforge/docker-compose.yaml up -d --build api
+
+## Allows a user to connect to the database via psql (useful for debugging)
+interface:
+	psql postgresql://osm:osm@localhost:5432/osm
 
 ## Show available targets
 help:
