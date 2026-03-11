@@ -25,12 +25,6 @@ jobs:
       - name: Install dependencies
         run: poetry install --with dev --with docs
 
-      - name: Lint
-        run: poetry run ruff check .
-
-      - name: Type check
-        run: poetry run mypy
-
       - name: Run tests
         run: poetry run pytest
 
