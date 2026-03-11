@@ -1,10 +1,13 @@
 [tool.poetry]
 name = "osmforge"
-version = "0.1.0"
+version = "1.0.0"
 description = "Self-hosted OpenStreetMap stack and Python client for spatial analysis"
 authors = ["Tom Freeman <tomrfreeman3@gmail.com>"]
 readme = "README.md"
 license = "MIT"
+homepage = "https://github.com/Tom3man/osm-forge"
+repository = "https://github.com/Tom3man/osm-forge"
+documentation = "https://tom3man.github.io/osm-forge/"
 keywords = ["osm", "openstreetmap", "gis", "geospatial", "postgis", "propagation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
